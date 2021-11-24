@@ -1,45 +1,47 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useParams } from "react-router-dom";
 import { Input, InputAdornment } from "@mui/material";
 import { Send } from "@mui/icons-material";
-import { makeStyles } from "@mui/styles";
-// import PropTypes from "prop-types";
+import { sendMessage, messageSelector } from "../../store/messages";
 import { Message } from "./message";
-
-// jss
-export const useStyles = makeStyles((ctx) => {
-  return {
-    input: {
-      color: "#9a9fa1",
-      padding: "10px 15px",
-      fontSize: "15px",
-    },
-    icon: {
-      color: "#2b5278",
-    },
-  };
-});
+import { useStyles } from "./use-styles";
+import { useBotAnswer } from "./hooks/use-bot-answer";
 
 export const MessageList = () => {
   const s = useStyles();
-
-  const [messageList, setMessageList] = useState([]);
+  const dispatch = useDispatch();
+  const { roomId } = useParams();
   const [value, setValue] = useState("");
+
+  const messageSelectorByMemo = useMemo(
+    () => messageSelector(roomId),
+    [roomId]
+  );
+
+  const messages = useSelector(messageSelectorByMemo);
 
   const ref = useRef(null);
 
-  const sendMessage = () => {
-    if (value) {
-      setMessageList([
-        ...messageList,
-        { author: "User", message: value, date: new Date() },
-      ]);
-      setValue("");
-    }
-  };
+  const send = useCallback(
+    (message, author = "User") => {
+      if (message) {
+        dispatch(sendMessage({ author, message }, roomId));
+        setValue("");
+      }
+    },
+    [dispatch, roomId]
+  );
 
   const handlePressInput = ({ code }) => {
     if (code === "Enter") {
-      sendMessage();
+      send(value);
     }
   };
 
@@ -51,25 +53,14 @@ export const MessageList = () => {
 
   useEffect(() => {
     handleScrollBottom();
-  }, [messageList, handleScrollBottom]);
+  }, [handleScrollBottom, messages]);
 
-  useEffect(() => {
-    const lastMessage = messageList[messageList.length - 1];
-
-    if (messageList.length && lastMessage.author === "User") {
-      setTimeout(() => {
-        setMessageList([
-          ...messageList,
-          { author: "Bot", message: "Hello from Bot", date: new Date() },
-        ]);
-      }, 500);
-    }
-  }, [messageList]);
+  useBotAnswer(messages, send);
 
   return (
     <>
       <div ref={ref}>
-        {messageList.map((message, index) => (
+        {messages.map((message, index) => (
           <Message key={index} message={message} />
         ))}
       </div>
@@ -83,7 +74,7 @@ export const MessageList = () => {
         onKeyPress={handlePressInput}
         endAdornment={
           <InputAdornment position="end">
-            {value && <Send onClick={sendMessage} className={s.icon} />}
+            {value && <Send onClick={() => send(value)} className={s.icon} />}
           </InputAdornment>
         }
       />
